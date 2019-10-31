@@ -9,6 +9,42 @@ namespace transvoice
 {
     class Program
     {
+        static string ReadAllText(string filename)
+        {
+            byte[] bs = File.ReadAllBytes(filename);
+            int len = bs.Length;
+            if (len >= 3 && bs[0] == 0xEF && bs[1] == 0xBB && bs[2] == 0xBF)
+            {
+                return Encoding.UTF8.GetString(bs, 3, len - 3);
+            }
+            int[] cs = { 7, 5, 4, 3, 2, 1, 0, 6, 14, 30, 62, 126 };
+            for (int i = 0; i < len; i++)
+            {
+                int bits = -1;
+                for (int j = 0; j < 6; j++)
+                {
+                    if (bs[i] >> cs[j] == cs[j + 6])
+                    {
+                        bits = j;
+                        break;
+                    }
+                }
+                if (bits == -1)
+                {
+                    return Encoding.Default.GetString(bs);
+                }
+                while (bits-- > 0)
+                {
+                    i++;
+                    if (i == len || bs[i] >> 6 != 2)
+                    {
+                        return Encoding.Default.GetString(bs);
+                    }
+                }
+            }
+            return Encoding.UTF8.GetString(bs);
+        }
+
         static void Main(string[] args)
         {
             if (args.Length < 1)
@@ -42,7 +78,11 @@ namespace transvoice
                     DispHelp();
                     return;
                 }
-                string content = File.ReadAllText(args[1]);
+                using FileStream fs = new FileStream(args[1], FileMode.Open, FileAccess.Read);
+
+                string content = ReadAllText(args[1]);
+
+                //string content = File.ReadAllText(args[1]);
                 var arr = content.Replace("\r", "").Split(new char[] { '\n' });
                 string basePath = args[2];
                 int rate = 1;
